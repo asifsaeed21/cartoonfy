@@ -22,6 +22,8 @@ install_and_import("numpy")
 
 import cv2
 import numpy as np
+import tkinter as tk
+from tkinter import filedialog, messagebox
 
 # --- Cartoonify Functions ---
 def read_image(image_path):
@@ -100,24 +102,34 @@ def display_and_save(original, cartoon, output_path):
     cv2.imwrite(output_path, cartoon)
     print(f"\nCartoonified image saved as: {output_path}\n")
 
-def main():
-    print("""
-==============================
-   Cartoonify an Image Tool
-==============================
-""")
-    image_path = input("Enter the path to your image file (.jpg, .png, etc.): ").strip('"')
-    if not os.path.isfile(image_path):
-        print("\n[Error] File does not exist. Please check the path and try again.\n")
+# --- GUI Section ---
+def select_and_cartoonify():
+    file_path = filedialog.askopenfilename(
+        title="Select an Image",
+        filetypes=[("Image Files", "*.jpg *.jpeg *.png *.bmp *.tiff")]
+    )
+    if not file_path:
         return
     try:
-        img = read_image(image_path)
+        img = read_image(file_path)
         cartoon = cartoonify_image(img)
-        base, ext = os.path.splitext(image_path)
+        base, ext = os.path.splitext(file_path)
         output_path = base + "_cartoonified" + ext
         display_and_save(img, cartoon, output_path)
+        messagebox.showinfo("Success", f"Cartoonified image saved as:\n{output_path}")
     except Exception as e:
-        print(f"\n[Error] {e}\n")
+        messagebox.showerror("Error", str(e))
+
+def main():
+    root = tk.Tk()
+    root.title("Cartoonify an Image")
+    root.geometry("350x150")
+    root.resizable(False, False)
+    label = tk.Label(root, text="Cartoonify any photo!\nClick below to select an image.", font=("Arial", 12), pady=20)
+    label.pack()
+    btn = tk.Button(root, text="Select Image", font=("Arial", 12, "bold"), command=select_and_cartoonify, bg="#4CAF50", fg="white", padx=20, pady=10)
+    btn.pack()
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
