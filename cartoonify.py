@@ -37,58 +37,76 @@ def read_image(image_path):
         raise ValueError(f"Could not read the image: {image_path}")
     return img
 
-def convert_to_grayscale(img):
+def color_quantization(img, k=8):
     """
-    Converts a BGR image to grayscale.
+    Reduce the number of colors in the image using k-means clustering for a cartoon effect.
     :param img: Input color image
-    :return: Grayscale image
+    :param k: Number of color clusters
+    :return: Quantized image
     """
-    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    data = np.float32(img).reshape((-1, 3))
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.001)
+    _, labels, centers = cv2.kmeans(data, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    centers = np.uint8(centers)
+    quantized = centers[labels.flatten()]
+    return quantized.reshape(img.shape)
 
-def apply_edge_detection(gray_img):
+def enhance_edges(img):
     """
-    Detects edges using adaptive thresholding after median blur.
-    :param gray_img: Grayscale image
-    :return: Edge mask
+    Create strong cartoon edges by combining adaptive threshold and Canny edge detection.
+    :param img: Input color image
+    :return: Edge mask (inverted for cartoon overlay)
     """
-    blurred = cv2.medianBlur(gray_img, 5)
-    edges = cv2.adaptiveThreshold(
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.medianBlur(gray, 7)
+    # Adaptive threshold for bold edges
+    edges_adapt = cv2.adaptiveThreshold(
         blurred, 255,
         cv2.ADAPTIVE_THRESH_MEAN_C,
         cv2.THRESH_BINARY,
         blockSize=9,
-        C=9
+        C=2
     )
+    # Canny for fine details
+    edges_canny = cv2.Canny(blurred, 100, 200)
+    # Combine both
+    edges = cv2.bitwise_or(edges_adapt, edges_canny)
+    # Invert for mask
+    edges = cv2.bitwise_not(edges)
     return edges
 
-def apply_bilateral_filter(img):
+def smooth_image(img):
     """
-    Smooths the image while preserving edges using bilateral filtering.
+    Apply bilateral filter multiple times for extra smooth, paint-like regions.
     :param img: Input color image
     :return: Smoothed image
     """
-    return cv2.bilateralFilter(img, d=9, sigmaColor=250, sigmaSpace=250)
+    temp = img.copy()
+    for _ in range(2):
+        temp = cv2.bilateralFilter(temp, d=9, sigmaColor=200, sigmaSpace=200)
+    return temp
 
 def cartoonify_image(img):
     """
-    Converts a normal image to a cartoon-style image.
+    Full cartoonification pipeline: color quantization, smoothing, edge enhancement, and overlay.
     :param img: Input color image
     :return: Cartoonified image
     """
-    gray = convert_to_grayscale(img)
-    edges = apply_edge_detection(gray)
-    color = apply_bilateral_filter(img)
-    cartoon = cv2.bitwise_and(color, color, mask=edges)
+    quantized = color_quantization(img, k=8)
+    smoothed = smooth_image(quantized)
+    edges = enhance_edges(img)
+    # Convert edges to 3 channels for overlay
+    edges_colored = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+    cartoon = cv2.bitwise_and(smoothed, edges_colored)
     return cartoon
 
 def display_and_save(original, cartoon, output_path):
     """
-    Displays the original and cartoonified images side by side and saves the cartoon image.
+    Display original and cartoonified images side by side and save the cartoon image.
     :param original: Original image
     :param cartoon: Cartoonified image
     :param output_path: Path to save the cartoonified image
     """
-    # Resize images for side-by-side display if too large
     max_width = 800
     scale = min(1.0, max_width / max(original.shape[1], cartoon.shape[1]))
     if scale < 1.0:
@@ -122,8 +140,8 @@ def select_and_cartoonify():
 
 def main():
     root = tk.Tk()
-    root.title("Cartoonify an Image")
-    root.geometry("350x150")
+    root.title("Cartoonify an Image - Fun Cartoon Effect!")
+    root.geometry("370x160")
     root.resizable(False, False)
     label = tk.Label(root, text="Cartoonify any photo!\nClick below to select an image.", font=("Arial", 12), pady=20)
     label.pack()

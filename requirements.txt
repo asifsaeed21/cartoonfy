@@ -1,3 +1,6 @@
+torch
+torchvision
+Pillow
 opencv-python
 numpy
 # tkinter (comes pre-installed with standard Python, listed for completeness)
